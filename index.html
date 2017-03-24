@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Chart using CSV Data</title>
+
+	<script type="text/javascript" src="http://canvasjs.com/assets/script/jquery-1.11.1.min.js"></script>
+	<script type="text/javascript" src="http://canvasjs.com/assets/script/canvasjs.min.js"></script>
+	<script src="https://code.highcharts.com/highcharts.js"></script>
+	<script src="https://code.highcharts.com/modules/exporting.js"></script>
+	<script src="./js/application.js"></script>
+</head>
+<body>
+	<div id="dvImportSegments" class="fileupload">
+		<fieldset>
+			<legend>Upload your CSV File</legend>
+			<input type="file" name="File Upload" id="txtFileUpload" accept=".csv" />
+		</fieldset>
+	</div>
+	<div id="buildsPerDay" style="min-width: 310px; height: 400px; margin: 0 auto"></div>
+	<div id="durationVsTime" style="min-width: 310px; height: 400px; margin: 0 auto"></div>
+</body>
+</html>
