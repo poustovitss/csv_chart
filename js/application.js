@@ -48,7 +48,7 @@ $(document).ready(function () {
                         summary[index].push(0);
                     }
                 } else {
-                csvData[i][summaryFieldName] == index ? summary[index].push(1) : summary[index].push(0);
+                    csvData[i][summaryFieldName] == index ? summary[index].push(1) : summary[index].push(0);
                 }
             });
         }
