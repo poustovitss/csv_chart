@@ -1,189 +1,175 @@
 $(document).ready(function () {
-  document.getElementById('txtFileUpload').addEventListener('change', upload, false);
+    $('#csvFileUpload').on('change', function(evt) {
+        var file = evt.target.files[0],
+            csvData,
+            csvHeaders;
 
-  function browserSupportFileUpload() {
-    var isCompatible = false;
-    if (window.File && window.FileReader && window.FileList && window.Blob) {
-      isCompatible = true;
-    }
-    return isCompatible;
-  }
-
-  function upload(evt) {
-    if (!browserSupportFileUpload()) {
-      alert('The File APIs are not fully supported in this browser!');
-    } else {
-      var file = evt.target.files[0];
-      var reader = new FileReader();
-      reader.readAsText(file);
-
-      reader.onload = function (event) {
-        var csvData = event.target.result;
-
-        if (csvData && csvData.length > 0) {
-          var csvLines = points = [];
-          var dayArr = [],
-              timeArr = [],
-              passedTestsArr = [],
-              failedTestsArr = [],
-              statusArr = [],
-              duration = [],
-              abnormal = [];
-          csvLines = csvData.split(/[\r?\n|\r|\n]+/);
-
-          for (var i = 1; i < csvLines.length; i++) {
-            if (csvLines[i].length > 0) {
-              points = csvLines[i].split(',');
-
-              setDataForBuildsPerDayChart(dayArr, passedTestsArr, failedTestsArr, abnormal);
-              setDataForDurationChart(timeArr, duration);
+        Papa.parse(file, {
+            header: true,
+            complete: function(results) {
+                csvData = results.data;
+                csvHeaders = results.meta.fields;
+                setDataForCharts();
             }
-          }
-          alert('Imported -' + csvLines.length + '- rows successfully!');
-          drawBuildsPerDay(dayArr, passedTestsArr, failedTestsArr, abnormal);
-          drawDurationVsTime(timeArr, duration);
-        } else {
-          alert('No data to import!');
-        }
-      };
-      reader.onerror = function () {
-        alert('Unable to read ' + file.fileName);
-      };
-    }
-  }
+        });
 
-  function setDataForBuildsPerDayChart(dayArr, passedTestsArr, failedTestsArr, abnormal) {
-    var summaryStatus = points[3].replace(/["']/g, "");
-    var passedTestsField = parseInt(points[11].replace('"', ''));
-    var failedTestsField = parseInt(points[12].replace('"', ''));
-    const ABNORMAL_ERROR_COUNT = 1;
-
-    if (summaryStatus == "passed") {
-      dayArr.push(new Date(points[2]));
-      passedTestsArr.push(passedTestsField);
-      failedTestsArr.push(0);
-      abnormal.push(0);
-    } else if (summaryStatus == "failed") {
-      dayArr.push(new Date(points[2]));
-      passedTestsArr.push(0);
-      failedTestsArr.push(failedTestsField);
-      if (points[12].replace(/["']/g, "") > ABNORMAL_ERROR_COUNT) {
-        abnormal.push(failedTestsField);
-      } else {
-        abnormal.push(0);
-      }
-    }
-  }
-  
-  function setDataForDurationChart(timeArr, duration) {
-    timeArr.push(new Date(points[2]));
-    duration.push(parseFloat(points[4].replace('"', '')));
-  };
-
-  function drawBuildsPerDay(dayArr, passedTestsArr, failedTestsArr, abnormal) {
-    Highcharts.chart('buildsPerDay', {
-      chart: {
-        type: 'area'
-      },
-      title: {
-        text: 'Builds Per Day bar chart'
-      },
-      xAxis: {
-        categories: dayArr,
-        tickmarkPlacement: 'on',
-        title: {
-          enabled: false
-        }
-      },
-      yAxis: {
-        title: {
-          text: 'Number'
-        },
-        labels: {
-          formatter: function () {
-            return this.value;
-          }
-        }
-      },
-      tooltip: {
-        split: true,
-        valueSuffix: ' tests'
-      },
-      plotOptions: {
-        area: {
-          stacking: 'normal',
-          lineColor: '#666666',
-          lineWidth: 1,
-          marker: {
-            lineWidth: 1,
-            lineColor: '#666666'
-          }
-        }
-      },
-      series: [{
-        name: 'Passed',
-        data: passedTestsArr
-      }, {
-        name: 'Failed',
-        data: failedTestsArr
-      }, {
-        type: 'spline',
-        name: 'abnormal',
-        data: abnormal,
-        marker: {
-          lineWidth: 2,
-          lineColor: Highcharts.getOptions().colors[3],
-          fillColor: 'red'
-        }
-      }
-      ]
+        function setDataForCharts() {
+            if (csvData.length > 0) {
+                setDataForBuildsPerDayChartAndDraw(csvData, csvHeaders);
+                setDataForDurationChartAndDraw(csvData);
+                alert('Imported -' + csvData.length + '- rows successfully!');
+            } else {
+                alert('No data to import!');
+            }
+        };
     });
-  };
 
-  function drawDurationVsTime(timeArr, duration) {
-    Highcharts.chart('durationVsTime', {
-      chart: {
-        type: 'area'
-      },
-      title: {
-        text: 'Duration VS Time bar chart'
-      },
-      xAxis: {
-        categories: timeArr,
-        tickmarkPlacement: 'on',
-        title: {
-          enabled: false
+    function setDataForBuildsPerDayChartAndDraw(csvData, headers) {
+        var xAxis = [],
+            summary = {
+                passed:  [],
+                failed:  [],
+                error:   [],
+                stopped: []
+            },
+            dateFieldName = "created_at",
+            summaryFieldName = "summary_status";
+
+        for (var i = 0; i < csvData.length; i++) {
+            xAxis.push(new Date(csvData[i][dateFieldName]));
+
+            $.each(summary, function(index) {
+                if (index == "stopped") {
+                    if (csvData[i][summaryFieldName] != "passed"
+                        && csvData[i][summaryFieldName] != "failed"
+                        && csvData[i][summaryFieldName] != "error") {
+                        summary[index].push(1);
+                    } else {
+                        summary[index].push(0);
+                    }
+                } else {
+                csvData[i][summaryFieldName] == index ? summary[index].push(1) : summary[index].push(0);
+                }
+            });
         }
-      },
-      yAxis: {
-        title: {
-          text: 'Duration'
-        },
-        labels: {
-          formatter: function () {
-            return this.value;
-          }
+
+        drawBuildsPerDay(xAxis, summary);
+    }
+
+    function setDataForDurationChartAndDraw(csvData) {
+        var xAxis = [],
+            duration = [],
+            dateFieldName = "created_at",
+            durationField = 'duration';
+
+        for (var i = 0; i < csvData.length; i++) {
+            xAxis.push(new Date(csvData[i][dateFieldName]));
+            duration.push(parseFloat(csvData[i][durationField]));
         }
-      },
-      tooltip: {
-        split: true,
-        valueSuffix: ' points'
-      },
-      plotOptions: {
-        area: {
-          stacking: 'normal',
-          lineColor: '#666666',
-          lineWidth: 1,
-          marker: {
-            lineWidth: 1,
-            lineColor: '#666666'
-          }
-        }
-      },
-      series: [{
-        name: 'Time',
-        data: duration
-      }]
-    });
-  };
+
+        drawDurationVsTime(xAxis, duration);
+    };
+
+    function drawBuildsPerDay(xAxis, summary) {
+        Highcharts.chart('buildsPerDay', {
+            chart: {
+                type: 'area'
+            },
+            title: {
+                text: 'Builds Per Day bar chart'
+            },
+            xAxis: {
+                categories: xAxis,
+                tickmarkPlacement: 'on',
+                title: {
+                    enabled: false
+                }
+            },
+            yAxis: {
+                title: {
+                    text: 'Number'
+                },
+                labels: {
+                    formatter: function () {
+                        return this.value;
+                    }
+                }
+            },
+            tooltip: {
+                split: true,
+                valueSuffix: ' tests'
+            },
+            plotOptions: {
+                area: {
+                    stacking: 'normal',
+                    lineColor: '#666666',
+                    lineWidth: 1,
+                    marker: {
+                        lineWidth: 1,
+                        lineColor: '#666666'
+                    }
+                }
+            },
+            series: [{
+                name: 'Passed',
+                data: summary.passed
+            }, {
+                name: 'Failed',
+                data: summary.failed
+            }, {
+                name: 'Error',
+                data: summary.error
+            }, {
+                name: 'Stopped',
+                data: summary.stopped
+            }]
+        });
+    };
+
+    function drawDurationVsTime(xAxis, duration) {
+        Highcharts.chart('durationVsTime', {
+            chart: {
+                type: 'area'
+            },
+            title: {
+                text: 'Duration VS Time bar chart'
+            },
+            xAxis: {
+                categories: xAxis,
+                tickmarkPlacement: 'on',
+                title: {
+                    enabled: false
+                }
+            },
+            yAxis: {
+                title: {
+                    text: 'Duration'
+                },
+                labels: {
+                    formatter: function () {
+                        return this.value;
+                    }
+                }
+            },
+            tooltip: {
+                split: true,
+                valueSuffix: ' points'
+            },
+            plotOptions: {
+                area: {
+                    stacking: 'normal',
+                    lineColor: '#666666',
+                    lineWidth: 1,
+                    marker: {
+                        lineWidth: 1,
+                        lineColor: '#666666'
+                    }
+                }
+            },
+            series: [{
+                name: 'Time',
+                data: duration
+            }]
+        });
+    };
 });
